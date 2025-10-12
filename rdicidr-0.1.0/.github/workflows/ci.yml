@@ -9,6 +9,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rdicidr-0.1.0
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,6 +43,9 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/stage' || github.ref == 'refs/heads/prod'
+    defaults:
+      run:
+        working-directory: rdicidr-0.1.0
 
     steps:
       - name: Checkout repository
