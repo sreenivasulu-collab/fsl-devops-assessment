@@ -19,28 +19,40 @@ jobs:
           node-version: 20
           cache: npm
 
+      # 🔍 Dynamically find project directory that contains package.json
+      - name: Detect project directory
+        id: detect-dir
+        run: |
+          PROJECT_DIR=$(find . -type f -name package.json -exec dirname {} \; | head -n 1)
+          echo "📁 Detected project directory: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Run ESLint
         run: npm run lint
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Check Prettier formatting
-        run: npm run prettier --write
+        run: npm run prettier --check
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Run unit tests
         run: CI=true npm run test -- --watchAll=false
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Build application
         run: |
           export NODE_OPTIONS=--openssl-legacy-provider
           npm run build
+        working-directory: ${{ env.PROJECT_DIR }}
 
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/stage' || github.ref == 'refs/heads/prod'
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,15 +62,23 @@ jobs:
         with:
           node-version: 20
 
+      - name: Detect project directory
+        id: detect-dir
+        run: |
+          PROJECT_DIR=$(find . -type f -name package.json -exec dirname {} \; | head -n 1)
+          echo "📁 Detected project directory: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Build React app
         run: |
           export NODE_OPTIONS=--openssl-legacy-provider
           npm run build
+        working-directory: ${{ env.PROJECT_DIR }}
 
-      # --- Dynamically map environment configuration ---
       - name: Load environment configuration
         id: set-env
         run: |
@@ -109,6 +129,7 @@ jobs:
       - name: Deploy to S3
         run: |
           aws s3 sync build/ s3://$S3_BUCKET --delete --only-show-errors
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Invalidate CloudFront cache
         run: |
