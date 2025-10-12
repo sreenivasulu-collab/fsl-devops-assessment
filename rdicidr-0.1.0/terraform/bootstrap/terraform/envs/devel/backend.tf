@@ -1,10 +1,10 @@
 terraform {
   backend "s3" {
-    bucket         = "fsl-devops-tfstate-devel-us-east-2"
+    bucket         = "fsl-devops-tfstate-devel-us-east-1"
     key            = "terraform.tfstate"
-    region         = "us-east-2"
-    dynamodb_table = "fsl-devops-lock-devel"
+    region         = "us-east-1"
     profile        = "fsl-devops-devel"
     encrypt        = true
+    use_lockfile   = true
   }
 }
