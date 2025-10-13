@@ -70,7 +70,9 @@ jobs:
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_DEVEL }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_DEVEL }}" >> $GITHUB_ENV
               echo "AWS_REGION=${{ vars.AWS_REGION_DEVEL }}" >> $GITHUB_ENV
-              echo "S3_BUCKET=${{ vars.S3_BUCKET_DEVEL }}" >> $GITHUB_ENV
+              echo "S3_BUCKET=$(echo '${{ vars.S3_BUCKET_STAGE }}' | tr -d '\r\n ')" >> $GITHUB_ENV
+
+              
               echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}" >> $GITHUB_ENV
               ;;
             stage)
