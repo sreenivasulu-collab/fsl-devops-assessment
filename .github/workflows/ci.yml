@@ -85,7 +85,7 @@ jobs:
         id: set-env
         shell: bash
         env:
-          # ✅ GitHub evaluates these repo-level variables before bash runs
+          # ✅ Repo-level variables — GitHub evaluates these before bash runs
           AWS_REGION_DEVEL: ${{ vars.AWS_REGION_DEVEL }}
           AWS_REGION_STAGE: ${{ vars.AWS_REGION_STAGE }}
           AWS_REGION_PROD: ${{ vars.AWS_REGION_PROD }}
@@ -99,14 +99,19 @@ jobs:
           # Export all provided GitHub variables into the shell
           export $(compgen -e | grep -E 'AWS_REGION_|S3_BUCKET_|CLOUDFRONT_DISTRIBUTION_ID_') >/dev/null 2>&1
 
-          # Normalize branch name (remove CR/LF and spaces)
-          BRANCH_NAME=$(echo "${GITHUB_REF##*/}" | tr -d '\r\n ' | xargs)
+          # ✅ Universal branch detection (works for push + PR)
+          if [ -n "${GITHUB_HEAD_REF}" ]; then
+            BRANCH_NAME=$(echo "${GITHUB_HEAD_REF}" | tr -d '\r\n ' | xargs)
+          else
+            BRANCH_NAME=$(echo "${GITHUB_REF_NAME}" | tr -d '\r\n ' | xargs)
+          fi
+
           echo "🔹 Current branch (sanitized): '$BRANCH_NAME'"
 
-          # 🔍 Debug line (temporary, confirm values)
-          echo "Debug: S3_BUCKET_STAGE in shell = '$S3_BUCKET_STAGE'"
-          echo "Debug: S3_BUCKET_PROD in shell  = '$S3_BUCKET_PROD'"
-          echo "Debug: S3_BUCKET_DEVEL in shell = '$S3_BUCKET_DEVEL'"
+          # 🔍 Debug: verify variable visibility
+          echo "Debug: S3_BUCKET_DEVEL = '$S3_BUCKET_DEVEL'"
+          echo "Debug: S3_BUCKET_STAGE = '$S3_BUCKET_STAGE'"
+          echo "Debug: S3_BUCKET_PROD  = '$S3_BUCKET_PROD'"
 
           # Assign environment-specific credentials and variables
           case "$BRANCH_NAME" in
