@@ -53,6 +53,7 @@ jobs:
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -79,75 +80,80 @@ jobs:
           npm run build
         working-directory: ${{ env.PROJECT_DIR }}
 
-      # ====================================================
-      # ================ DEVEL DEPLOYMENT ==================
-      # ====================================================
-      - name: Configure AWS credentials (devel)
-        if: github.ref_name == 'devel'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEVEL }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEVEL }}
-          aws-region: ${{ vars.AWS_REGION_DEVEL }}
+      # =========================================================
+      # =================== UNIFIED DEPLOY ======================
+      # =========================================================
+      - name: Deploy to correct environment
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
 
-      - name: Deploy to S3 (devel)
-        if: github.ref_name == 'devel'
+          # AWS credentials
+          AWS_ACCESS_KEY_ID_DEVEL: ${{ secrets.AWS_ACCESS_KEY_ID_DEVEL }}
+          AWS_SECRET_ACCESS_KEY_DEVEL: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEVEL }}
+          AWS_ACCESS_KEY_ID_STAGE: ${{ secrets.AWS_ACCESS_KEY_ID_STAGE }}
+          AWS_SECRET_ACCESS_KEY_STAGE: ${{ secrets.AWS_SECRET_ACCESS_KEY_STAGE }}
+          AWS_ACCESS_KEY_ID_PROD: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          AWS_SECRET_ACCESS_KEY_PROD: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+
+          # Variables
+          AWS_REGION_DEVEL: ${{ vars.AWS_REGION_DEVEL }}
+          AWS_REGION_STAGE: ${{ vars.AWS_REGION_STAGE }}
+          AWS_REGION_PROD: ${{ vars.AWS_REGION_PROD }}
+          S3_BUCKET_DEVEL: ${{ vars.S3_BUCKET_DEVEL }}
+          S3_BUCKET_STAGE: ${{ vars.S3_BUCKET_STAGE }}
+          S3_BUCKET_PROD: ${{ vars.S3_BUCKET_PROD }}
+          CF_ID_DEVEL: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}
+          CF_ID_STAGE: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}
+          CF_ID_PROD: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}
+
         run: |
-          BUCKET="${{ vars.S3_BUCKET_DEVEL }}"
-          DIST_ID="${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}"
-          echo "🚀 Deploying to DEVEL bucket: $BUCKET"
-          aws s3 sync build/ "s3://$BUCKET" --delete --only-show-errors
-          echo "🧹 Invalidating CloudFront cache..."
-          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
-          echo "✅ Deployment complete for DEVEL environment"
+          echo "🔹 Branch detected: $BRANCH_NAME"
 
-      # ====================================================
-      # ================ STAGE DEPLOYMENT ==================
-      # ====================================================
-      - name: Configure AWS credentials (stage)
-        if: github.ref_name == 'stage'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_STAGE }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_STAGE }}
-          aws-region: ${{ vars.AWS_REGION_STAGE }}
+          case "$BRANCH_NAME" in
+            devel)
+              export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID_DEVEL"
+              export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY_DEVEL"
+              export AWS_REGION="$AWS_REGION_DEVEL"
+              BUCKET="$S3_BUCKET_DEVEL"
+              DIST_ID="$CF_ID_DEVEL"
+              ;;
+            stage)
+              export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID_STAGE"
+              export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY_STAGE"
+              export AWS_REGION="$AWS_REGION_STAGE"
+              BUCKET="$S3_BUCKET_STAGE"
+              DIST_ID="$CF_ID_STAGE"
+              ;;
+            prod)
+              export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID_PROD"
+              export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY_PROD"
+              export AWS_REGION="$AWS_REGION_PROD"
+              BUCKET="$S3_BUCKET_PROD"
+              DIST_ID="$CF_ID_PROD"
+              ;;
+            *)
+              echo "❌ Unsupported branch: $BRANCH_NAME"
+              exit 1
+              ;;
+          esac
 
-      - name: Deploy to S3 (stage)
-        if: github.ref_name == 'stage'
-        run: |
-          BUCKET="${{ vars.S3_BUCKET_STAGE }}"
-          DIST_ID="${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}"
-          echo "🚀 Deploying to STAGE bucket: $BUCKET"
-          aws s3 sync build/ "s3://$BUCKET" --delete --only-show-errors
-          echo "🧹 Invalidating CloudFront cache..."
-          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
-          echo "✅ Deployment complete for STAGE environment"
+          echo "🧩 Environment: $BRANCH_NAME"
+          echo "🌍 Region: $AWS_REGION"
+          echo "🪣 Bucket: $BUCKET"
+          echo "☁️ CloudFront ID: $DIST_ID"
 
-      # ====================================================
-      # ================ PROD DEPLOYMENT ===================
-      # ====================================================
-      - name: Configure AWS credentials (prod)
-        if: github.ref_name == 'prod'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
-          aws-region: ${{ vars.AWS_REGION_PROD }}
+          # Deploy to S3
+          aws s3 sync build/ "s3://$BUCKET" --region "$AWS_REGION" --delete --only-show-errors || {
+            echo "❌ S3 sync failed"; exit 1;
+          }
 
-      - name: Deploy to S3 (prod)
-        if: github.ref_name == 'prod'
-        run: |
-          BUCKET="${{ vars.S3_BUCKET_PROD }}"
-          DIST_ID="${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}"
-          echo "🚀 Deploying to PROD bucket: $BUCKET"
-          aws s3 sync build/ "s3://$BUCKET" --delete --only-show-errors
-          echo "🧹 Invalidating CloudFront cache..."
-          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
-          echo "✅ Deployment complete for PROD environment"
+          # Invalidate cache
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" || {
+            echo "❌ CloudFront invalidation failed"; exit 1;
+          }
 
-      # ====================================================
-      # =================== SUMMARY ========================
-      # ====================================================
+          echo "✅ Deployment successful for environment: $BRANCH_NAME"
+
       - name: ✅ Deployment summary
         run: |
           echo "🎉 Deployment complete for branch: ${{ github.ref_name }}"
