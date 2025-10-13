@@ -52,7 +52,8 @@ jobs:
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/stage' || github.ref == 'refs/heads/prod'
+    if: startsWith(github.ref, 'refs/heads/devel') || startsWith(github.ref, 'refs/heads/stage') || startsWith(github.ref, 'refs/heads/prod')
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
