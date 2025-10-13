@@ -85,7 +85,7 @@ jobs:
         id: set-env
         shell: bash
         env:
-          # ✅ Repo-level variables — GitHub evaluates these before bash runs
+          # ✅ GitHub evaluates these repo-level variables before bash runs
           AWS_REGION_DEVEL: ${{ vars.AWS_REGION_DEVEL }}
           AWS_REGION_STAGE: ${{ vars.AWS_REGION_STAGE }}
           AWS_REGION_PROD: ${{ vars.AWS_REGION_PROD }}
@@ -99,11 +99,14 @@ jobs:
           # Export all provided GitHub variables into the shell
           export $(compgen -e | grep -E 'AWS_REGION_|S3_BUCKET_|CLOUDFRONT_DISTRIBUTION_ID_') >/dev/null 2>&1
 
-          BRANCH_NAME="${GITHUB_REF##*/}"
-          echo "🔹 Current branch: $BRANCH_NAME"
+          # Normalize branch name (remove CR/LF and spaces)
+          BRANCH_NAME=$(echo "${GITHUB_REF##*/}" | tr -d '\r\n ' | xargs)
+          echo "🔹 Current branch (sanitized): '$BRANCH_NAME'"
 
           # 🔍 Debug line (temporary, confirm values)
-          echo "Debug: S3_BUCKET_STAGE value seen in shell: '$S3_BUCKET_STAGE'"
+          echo "Debug: S3_BUCKET_STAGE in shell = '$S3_BUCKET_STAGE'"
+          echo "Debug: S3_BUCKET_PROD in shell  = '$S3_BUCKET_PROD'"
+          echo "Debug: S3_BUCKET_DEVEL in shell = '$S3_BUCKET_DEVEL'"
 
           # Assign environment-specific credentials and variables
           case "$BRANCH_NAME" in
@@ -134,12 +137,13 @@ jobs:
               ;;
           esac
 
-          # ✅ Trim and validate
-          if [ -z "$S3_BUCKET_RAW" ]; then
-            echo "❌ ERROR: S3_BUCKET_RAW is empty. Check repository variables."
+          # ✅ Trim and validate bucket
+          CLEAN_BUCKET=$(echo "$S3_BUCKET_RAW" | tr -d '\r\n ' | xargs)
+          if [ -z "$CLEAN_BUCKET" ]; then
+            echo "❌ ERROR: S3_BUCKET_RAW is empty after assignment. Check variable names or values."
             exit 1
           fi
-          CLEAN_BUCKET=$(echo "$S3_BUCKET_RAW" | tr -d '\r\n ' | xargs)
+
           echo "S3_BUCKET=$CLEAN_BUCKET" >> $GITHUB_ENV
           echo "✅ Bucket resolved to: $CLEAN_BUCKET"
 
