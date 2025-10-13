@@ -107,6 +107,8 @@ jobs:
           fi
 
           echo "🔹 Current branch (sanitized): '$BRANCH_NAME'"
+          printf '🔍 Raw bytes in BRANCH_NAME: '
+          printf '%s' "$BRANCH_NAME" | od -An -tx1
 
           # 🔍 Debug: verify variable visibility
           echo "Debug: S3_BUCKET_DEVEL = '$S3_BUCKET_DEVEL'"
