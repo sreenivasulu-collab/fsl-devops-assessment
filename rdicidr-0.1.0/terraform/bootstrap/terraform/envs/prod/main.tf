@@ -22,10 +22,13 @@ module "s3_static_site" {
 
   project       = local.project
   environment   = local.environment
+  aws_region    = var.aws_region
   log_bucket    = var.log_bucket
   sse_algorithm = var.sse_algorithm
   kms_key_id    = var.kms_key_id
 }
+
+
 
 ########################################
 # CloudFront CDN Module

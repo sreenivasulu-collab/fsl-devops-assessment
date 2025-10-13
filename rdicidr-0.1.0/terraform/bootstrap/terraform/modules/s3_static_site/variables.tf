@@ -24,3 +24,7 @@ variable "kms_key_id" {
   type        = string
   default     = ""
 }
+variable "aws_region" {
+  description = "AWS region for the current environment"
+  type        = string
+}

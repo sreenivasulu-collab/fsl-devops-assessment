@@ -24,10 +24,17 @@ locals {
 }
 
 ########################################
+# Random ID for Unique OAC Name
+########################################
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+########################################
 # Origin Access Control
 ########################################
 resource "aws_cloudfront_origin_access_control" "oac" {
-  name                              = "${var.project}-${var.environment}-oac"
+  name                              = "${var.project}-${var.environment}-oac-${random_id.suffix.hex}"
   description                       = "OAC for ${var.project}-${var.environment}-web"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
@@ -51,20 +58,20 @@ resource "aws_cloudfront_distribution" "this" {
   }
 
   default_cache_behavior {
-    target_origin_id       = "s3-${var.environment}-origin"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
+    target_origin_id         = "s3-${var.environment}-origin"
+    viewer_protocol_policy   = "redirect-to-https"
+    allowed_methods          = ["GET", "HEAD", "OPTIONS"]
+    cached_methods           = ["GET", "HEAD"]
+    compress                 = true
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_optimized.id
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.cors_s3.id
   }
 
-  logging_config {
-    include_cookies = false
-    bucket          = var.log_bucket_domain
-    prefix          = "${var.environment}/cloudfront/"
-  }
+  # logging_config {
+  #   include_cookies = false
+  #   bucket          = var.log_bucket_domain
+  #   prefix          = "${var.environment}/cloudfront/"
+  # }
 
   viewer_certificate {
     cloudfront_default_certificate = true

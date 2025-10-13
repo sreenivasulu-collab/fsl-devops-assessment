@@ -12,6 +12,13 @@ terraform {
 }
 
 ########################################
+# Random Suffix to Ensure Unique Bucket Names
+########################################
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+########################################
 # Locals - Common Tags
 ########################################
 locals {
@@ -20,6 +27,7 @@ locals {
     Environment  = var.environment
     ManagedBy    = "Terraform"
     Compliance   = "FullstackLabs"
+    Name         = "${var.project}-${var.environment}-web"
   }
 }
 
@@ -27,12 +35,10 @@ locals {
 # S3 Bucket
 ########################################
 resource "aws_s3_bucket" "this" {
-  bucket        = "${var.project}-${var.environment}-web"
+  bucket        = "${var.project}-${var.environment}-web-${random_id.suffix.hex}"
   force_destroy = true
 
-  tags = merge(local.common_tags, {
-    Name = "${var.project}-${var.environment}-web"
-  })
+  tags = local.common_tags
 }
 
 ########################################
@@ -69,9 +75,22 @@ resource "aws_s3_bucket_versioning" "versioning" {
 }
 
 ########################################
-# Logging
+# Conditional Logging (safe cross-region logic)
 ########################################
+
+# Try to read log bucket metadata (if exists)
+data "aws_s3_bucket" "log_bucket" {
+  bucket = var.log_bucket
+}
+
+# Determine if same-region logging is allowed
+locals {
+  same_region_logging = try(data.aws_s3_bucket.log_bucket.region, "") == var.aws_region
+}
+
+# Enable logging only when safe
 resource "aws_s3_bucket_logging" "logging" {
+  count         = local.same_region_logging ? 1 : 0
   bucket        = aws_s3_bucket.this.id
   target_bucket = var.log_bucket
   target_prefix = "${var.environment}/s3/"
@@ -85,7 +104,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "encryption" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = var.sse_algorithm
+      sse_algorithm     = var.sse_algorithm != "" ? var.sse_algorithm : "AES256"
       kms_master_key_id = var.kms_key_id != "" ? var.kms_key_id : null
     }
   }
@@ -111,4 +130,3 @@ resource "aws_s3_bucket_lifecycle_configuration" "lifecycle" {
     }
   }
 }
-
