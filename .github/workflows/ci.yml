@@ -86,6 +86,7 @@ jobs:
       - name: Deploy to correct environment
         env:
           BRANCH_NAME: ${{ github.ref_name }}
+          PROJECT_DIR: ${{ env.PROJECT_DIR }}
 
           # AWS credentials
           AWS_ACCESS_KEY_ID_DEVEL: ${{ secrets.AWS_ACCESS_KEY_ID_DEVEL }}
@@ -141,13 +142,30 @@ jobs:
           echo "🌍 Region: $AWS_REGION"
           echo "🪣 Bucket: $BUCKET"
           echo "☁️ CloudFront ID: $DIST_ID"
+          echo "📂 Project directory: $PROJECT_DIR"
 
-          # Deploy to S3
-          aws s3 sync build/ "s3://$BUCKET" --region "$AWS_REGION" --delete --only-show-errors || {
+          # ✅ Validate build path
+          if [ ! -d "$PROJECT_DIR/build" ]; then
+            echo "❌ Build folder not found at: $PROJECT_DIR/build"
+            echo "🧠 Trying fallback search..."
+            ALT_BUILD=$(find . -type d -name build | head -n 1)
+            if [ -z "$ALT_BUILD" ]; then
+              echo "🚨 No build folder found anywhere in repo!"
+              exit 1
+            else
+              echo "✅ Found build folder at: $ALT_BUILD"
+              PROJECT_DIR=$(dirname "$ALT_BUILD")
+            fi
+          fi
+
+          # ✅ Deploy to S3
+          echo "🚀 Syncing $PROJECT_DIR/build → s3://$BUCKET"
+          aws s3 sync "$PROJECT_DIR/build/" "s3://$BUCKET" --region "$AWS_REGION" --delete --only-show-errors || {
             echo "❌ S3 sync failed"; exit 1;
           }
 
-          # Invalidate cache
+          # ✅ Invalidate CloudFront cache
+          echo "🧹 Invalidating CloudFront cache..."
           aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" || {
             echo "❌ CloudFront invalidation failed"; exit 1;
           }
@@ -157,3 +175,5 @@ jobs:
       - name: ✅ Deployment summary
         run: |
           echo "🎉 Deployment complete for branch: ${{ github.ref_name }}"
+          echo "🪣 Bucket: ${{ env.S3_BUCKET_STAGE }}"
+          echo "🌐 CloudFront ID: ${{ env.CF_ID_STAGE }}"
