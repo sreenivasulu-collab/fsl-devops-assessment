@@ -85,7 +85,7 @@ jobs:
         id: set-env
         shell: bash
         env:
-          # ✅ GitHub expands these repo-level variables before bash runs
+          # ✅ Repo-level variables — GitHub evaluates these before bash runs
           AWS_REGION_DEVEL: ${{ vars.AWS_REGION_DEVEL }}
           AWS_REGION_STAGE: ${{ vars.AWS_REGION_STAGE }}
           AWS_REGION_PROD: ${{ vars.AWS_REGION_PROD }}
@@ -96,8 +96,14 @@ jobs:
           CLOUDFRONT_DISTRIBUTION_ID_STAGE: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}
           CLOUDFRONT_DISTRIBUTION_ID_PROD: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}
         run: |
+          # Export all provided GitHub variables into the shell
+          export $(compgen -e | grep -E 'AWS_REGION_|S3_BUCKET_|CLOUDFRONT_DISTRIBUTION_ID_') >/dev/null 2>&1
+
           BRANCH_NAME="${GITHUB_REF##*/}"
           echo "🔹 Current branch: $BRANCH_NAME"
+
+          # 🔍 Debug line (temporary, confirm values)
+          echo "Debug: S3_BUCKET_STAGE value seen in shell: '$S3_BUCKET_STAGE'"
 
           # Assign environment-specific credentials and variables
           case "$BRANCH_NAME" in
@@ -128,7 +134,7 @@ jobs:
               ;;
           esac
 
-          # ✅ Trim bucket safely
+          # ✅ Trim and validate
           if [ -z "$S3_BUCKET_RAW" ]; then
             echo "❌ ERROR: S3_BUCKET_RAW is empty. Check repository variables."
             exit 1
