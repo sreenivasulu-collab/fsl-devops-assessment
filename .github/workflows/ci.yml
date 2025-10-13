@@ -91,21 +91,21 @@ jobs:
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_DEVEL }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_DEVEL }}" >> $GITHUB_ENV
               echo "AWS_REGION=${{ vars.AWS_REGION_DEVEL }}" >> $GITHUB_ENV
-              echo "S3_BUCKET=${{ vars.S3_BUCKET_DEVEL }}" >> $GITHUB_ENV
+              echo "S3_BUCKET=$(echo ${{ vars.S3_BUCKET_DEVEL }} | tr -d '\r\n ')" >> $GITHUB_ENV
               echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}" >> $GITHUB_ENV
               ;;
             stage)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_STAGE }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_STAGE }}" >> $GITHUB_ENV
               echo "AWS_REGION=${{ vars.AWS_REGION_STAGE }}" >> $GITHUB_ENV
-              echo "S3_BUCKET=${{ vars.S3_BUCKET_STAGE }}" >> $GITHUB_ENV
+              echo "S3_BUCKET=$(echo ${{ vars.S3_BUCKET_STAGE }} | tr -d '\r\n ')" >> $GITHUB_ENV
               echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}" >> $GITHUB_ENV
               ;;
             prod)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_PROD }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}" >> $GITHUB_ENV
               echo "AWS_REGION=${{ vars.AWS_REGION_PROD }}" >> $GITHUB_ENV
-              echo "S3_BUCKET=${{ vars.S3_BUCKET_PROD }}" >> $GITHUB_ENV
+              echo "S3_BUCKET=$(echo ${{ vars.S3_BUCKET_PROD }} | tr -d '\r\n ')" >> $GITHUB_ENV
               echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}" >> $GITHUB_ENV
               ;;
             *)
@@ -121,17 +121,22 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Debug bucket name (optional but recommended)
+        run: |
+          echo "✅ Final bucket: '$S3_BUCKET'"
+          echo "✅ Length: ${#S3_BUCKET}"
+
       - name: Validate S3 and CloudFront resources
         run: |
           echo "Using bucket: $S3_BUCKET in region $AWS_REGION"
           echo "CloudFront distribution: $CLOUDFRONT_DISTRIBUTION_ID"
-          aws s3api head-bucket --bucket $S3_BUCKET || { echo "S3 bucket not found"; exit 1; }
+          aws s3api head-bucket --bucket "$S3_BUCKET" || { echo "❌ S3 bucket not found or invalid"; exit 1; }
 
       - name: Deploy to S3
         run: |
-          aws s3 sync build/ s3://$S3_BUCKET --delete --only-show-errors
+          aws s3 sync build/ s3://"$S3_BUCKET" --delete --only-show-errors
         working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Invalidate CloudFront cache
         run: |
-          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+          aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
