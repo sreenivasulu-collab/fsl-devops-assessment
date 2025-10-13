@@ -84,6 +84,17 @@ jobs:
       - name: Load environment configuration
         id: set-env
         shell: bash
+        env:
+          # ✅ GitHub expands these before bash runs
+          S3_BUCKET_DEVEL: ${{ vars.S3_BUCKET_DEVEL }}
+          S3_BUCKET_STAGE: ${{ vars.S3_BUCKET_STAGE }}
+          S3_BUCKET_PROD: ${{ vars.S3_BUCKET_PROD }}
+          CLOUDFRONT_DISTRIBUTION_ID_DEVEL: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}
+          CLOUDFRONT_DISTRIBUTION_ID_STAGE: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}
+          CLOUDFRONT_DISTRIBUTION_ID_PROD: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}
+          AWS_REGION_DEVEL: ${{ vars.AWS_REGION_DEVEL }}
+          AWS_REGION_STAGE: ${{ vars.AWS_REGION_STAGE }}
+          AWS_REGION_PROD: ${{ vars.AWS_REGION_PROD }}
         run: |
           BRANCH_NAME="${GITHUB_REF##*/}"
           echo "🔹 Current branch: $BRANCH_NAME"
@@ -93,23 +104,23 @@ jobs:
             devel)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_DEVEL }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_DEVEL }}" >> $GITHUB_ENV
-              echo "AWS_REGION=${{ vars.AWS_REGION_DEVEL }}" >> $GITHUB_ENV
-              echo "S3_BUCKET_RAW=${{ vars.S3_BUCKET_DEVEL }}" >> $GITHUB_ENV
-              echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}" >> $GITHUB_ENV
+              echo "AWS_REGION=$AWS_REGION_DEVEL" >> $GITHUB_ENV
+              echo "S3_BUCKET_RAW=$S3_BUCKET_DEVEL" >> $GITHUB_ENV
+              echo "CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_ID_DEVEL" >> $GITHUB_ENV
               ;;
             stage)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_STAGE }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_STAGE }}" >> $GITHUB_ENV
-              echo "AWS_REGION=${{ vars.AWS_REGION_STAGE }}" >> $GITHUB_ENV
-              echo "S3_BUCKET_RAW=${{ vars.S3_BUCKET_STAGE }}" >> $GITHUB_ENV
-              echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}" >> $GITHUB_ENV
+              echo "AWS_REGION=$AWS_REGION_STAGE" >> $GITHUB_ENV
+              echo "S3_BUCKET_RAW=$S3_BUCKET_STAGE" >> $GITHUB_ENV
+              echo "CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_ID_STAGE" >> $GITHUB_ENV
               ;;
             prod)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_PROD }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}" >> $GITHUB_ENV
-              echo "AWS_REGION=${{ vars.AWS_REGION_PROD }}" >> $GITHUB_ENV
-              echo "S3_BUCKET_RAW=${{ vars.S3_BUCKET_PROD }}" >> $GITHUB_ENV
-              echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}" >> $GITHUB_ENV
+              echo "AWS_REGION=$AWS_REGION_PROD" >> $GITHUB_ENV
+              echo "S3_BUCKET_RAW=$S3_BUCKET_PROD" >> $GITHUB_ENV
+              echo "CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_ID_PROD" >> $GITHUB_ENV
               ;;
             *)
               echo "❌ Unsupported branch: $BRANCH_NAME"
@@ -117,9 +128,14 @@ jobs:
               ;;
           esac
 
-          # ✅ Trim bucket name of any newlines/spaces safely
+          # ✅ Trim bucket safely
+          if [ -z "$S3_BUCKET_RAW" ]; then
+            echo "❌ ERROR: S3_BUCKET_RAW is empty. Check environment vars."
+            exit 1
+          fi
           CLEAN_BUCKET=$(echo "$S3_BUCKET_RAW" | tr -d '\r\n ' | xargs)
           echo "S3_BUCKET=$CLEAN_BUCKET" >> $GITHUB_ENV
+          echo "✅ Bucket resolved to: $CLEAN_BUCKET"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
