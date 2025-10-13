@@ -9,6 +9,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,7 +20,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      # 🔍 Dynamically find project directory that contains package.json
+      # 🔍 Detect project directory dynamically
       - name: Detect project directory
         id: detect-dir
         run: |
@@ -82,37 +83,43 @@ jobs:
 
       - name: Load environment configuration
         id: set-env
+        shell: bash
         run: |
           BRANCH_NAME="${GITHUB_REF##*/}"
           echo "🔹 Current branch: $BRANCH_NAME"
 
+          # Assign environment-specific credentials and variables
           case "$BRANCH_NAME" in
             devel)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_DEVEL }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_DEVEL }}" >> $GITHUB_ENV
               echo "AWS_REGION=${{ vars.AWS_REGION_DEVEL }}" >> $GITHUB_ENV
-              echo "S3_BUCKET=$(echo ${{ vars.S3_BUCKET_DEVEL }} | tr -d '\r\n ')" >> $GITHUB_ENV
+              echo "S3_BUCKET_RAW=${{ vars.S3_BUCKET_DEVEL }}" >> $GITHUB_ENV
               echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}" >> $GITHUB_ENV
               ;;
             stage)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_STAGE }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_STAGE }}" >> $GITHUB_ENV
               echo "AWS_REGION=${{ vars.AWS_REGION_STAGE }}" >> $GITHUB_ENV
-              echo "S3_BUCKET=$(echo ${{ vars.S3_BUCKET_STAGE }} | tr -d '\r\n ')" >> $GITHUB_ENV
+              echo "S3_BUCKET_RAW=${{ vars.S3_BUCKET_STAGE }}" >> $GITHUB_ENV
               echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}" >> $GITHUB_ENV
               ;;
             prod)
               echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_PROD }}" >> $GITHUB_ENV
               echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}" >> $GITHUB_ENV
               echo "AWS_REGION=${{ vars.AWS_REGION_PROD }}" >> $GITHUB_ENV
-              echo "S3_BUCKET=$(echo ${{ vars.S3_BUCKET_PROD }} | tr -d '\r\n ')" >> $GITHUB_ENV
+              echo "S3_BUCKET_RAW=${{ vars.S3_BUCKET_PROD }}" >> $GITHUB_ENV
               echo "CLOUDFRONT_DISTRIBUTION_ID=${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}" >> $GITHUB_ENV
               ;;
             *)
-              echo "Unsupported branch: $BRANCH_NAME"
+              echo "❌ Unsupported branch: $BRANCH_NAME"
               exit 1
               ;;
           esac
+
+          # ✅ Trim bucket name of any newlines/spaces safely
+          CLEAN_BUCKET=$(echo "$S3_BUCKET_RAW" | tr -d '\r\n ' | xargs)
+          echo "S3_BUCKET=$CLEAN_BUCKET" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -121,7 +128,7 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Debug bucket name (optional but recommended)
+      - name: Debug bucket name
         run: |
           echo "✅ Final bucket: '$S3_BUCKET'"
           echo "✅ Length: ${#S3_BUCKET}"
@@ -134,9 +141,17 @@ jobs:
 
       - name: Deploy to S3
         run: |
+          echo "🚀 Syncing files to s3://$S3_BUCKET ..."
           aws s3 sync build/ s3://"$S3_BUCKET" --delete --only-show-errors
         working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Invalidate CloudFront cache
         run: |
+          echo "🧹 Invalidating CloudFront cache..."
           aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
+
+      - name: ✅ Deployment summary
+        run: |
+          echo "🎉 Deployment complete for branch '$BRANCH_NAME'"
+          echo "🪣 Bucket: $S3_BUCKET"
+          echo "🌐 CloudFront: $CLOUDFRONT_DISTRIBUTION_ID"
