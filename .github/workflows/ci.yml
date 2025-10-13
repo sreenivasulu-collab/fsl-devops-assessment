@@ -85,16 +85,16 @@ jobs:
         id: set-env
         shell: bash
         env:
-          # ✅ GitHub expands these before bash runs
+          # ✅ GitHub expands these repo-level variables before bash runs
+          AWS_REGION_DEVEL: ${{ vars.AWS_REGION_DEVEL }}
+          AWS_REGION_STAGE: ${{ vars.AWS_REGION_STAGE }}
+          AWS_REGION_PROD: ${{ vars.AWS_REGION_PROD }}
           S3_BUCKET_DEVEL: ${{ vars.S3_BUCKET_DEVEL }}
           S3_BUCKET_STAGE: ${{ vars.S3_BUCKET_STAGE }}
           S3_BUCKET_PROD: ${{ vars.S3_BUCKET_PROD }}
           CLOUDFRONT_DISTRIBUTION_ID_DEVEL: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_DEVEL }}
           CLOUDFRONT_DISTRIBUTION_ID_STAGE: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_STAGE }}
           CLOUDFRONT_DISTRIBUTION_ID_PROD: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID_PROD }}
-          AWS_REGION_DEVEL: ${{ vars.AWS_REGION_DEVEL }}
-          AWS_REGION_STAGE: ${{ vars.AWS_REGION_STAGE }}
-          AWS_REGION_PROD: ${{ vars.AWS_REGION_PROD }}
         run: |
           BRANCH_NAME="${GITHUB_REF##*/}"
           echo "🔹 Current branch: $BRANCH_NAME"
@@ -130,7 +130,7 @@ jobs:
 
           # ✅ Trim bucket safely
           if [ -z "$S3_BUCKET_RAW" ]; then
-            echo "❌ ERROR: S3_BUCKET_RAW is empty. Check environment vars."
+            echo "❌ ERROR: S3_BUCKET_RAW is empty. Check repository variables."
             exit 1
           fi
           CLEAN_BUCKET=$(echo "$S3_BUCKET_RAW" | tr -d '\r\n ' | xargs)
